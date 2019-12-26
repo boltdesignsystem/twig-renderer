@@ -6,6 +6,7 @@
   "module": "dist/twig-renderer.mjs.js",
   "types": "index.d.ts",
   "scripts": {
+    "postbootstrap": "yarn build",
     "build": "rm -rf dist && mkdir dist && cp src/*.php dist/ && rollup --config rollup.config.js",
     "start": "nodemon --ext .js,.php --watch src/ --watch config.schema.json --exec 'npm run build' ",
     "lint": "eslint .",
@@ -22,12 +23,12 @@
     "@babel/core": "^7.2.0",
     "@babel/preset-env": "^7.2.0",
     "ajv": "^6.5.2",
-    "execa": "^1.0.0",
+    "execa": "^4.0.0",
     "fs-extra": "^7.0.1",
     "node-fetch": "^2.1.2",
     "sleep-promise": "^8.0.1",
     "conf": "^5.0.0",
-    "get-port": "^5.0.0"
+    "get-port": "^5.1.0"
   },
   "devDependencies": {
     "@babel/plugin-transform-modules-commonjs": "^7.2.0",
