@@ -6,7 +6,7 @@
   "module": "dist/twig-renderer.mjs.js",
   "types": "index.d.ts",
   "scripts": {
-    "postbootstrap": "yarn build",
+    "postinstall": "npm run prepare && npm run build",
     "build": "rm -rf dist && mkdir dist && cp src/*.php dist/ && rollup --config rollup.config.js",
     "start": "nodemon --ext .js,.php --watch src/ --watch config.schema.json --exec 'npm run build' ",
     "lint": "eslint .",
