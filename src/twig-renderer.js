@@ -29,7 +29,7 @@ class TwigRenderer {
    */
   constructor(userConfig) {
     try {
-      execa.shellSync('php --version');
+      execa.sync('php', ['--version']);
     } catch (err) {
       console.error('Error: php cli required. ', err.message);
       process.exit(1);
@@ -139,22 +139,17 @@ class TwigRenderer {
   }
 
   async getOpenPort() {
-    let portSelected = await getPort({
-      host: '127.0.0.1', // helps ensure the host being checked matches the PHP server being spun up
+    this.portSelected = await getPort({
+      host: '127.0.0.1',
     });
 
-    // pick another port if the one selected has already been taken
-    while (this.configStore.has(`ports.${portSelected}`)) {
-      // eslint-disable-next-line no-await-in-loop
-      portSelected = await getPort({
-        host: '127.0.0.1', // helps ensure the host being checked matches the PHP server being spun up
+    while (this.configStore.has(`ports.${this.portSelected}`)) {
+      this.portSelected = await getPort({
+        host: '127.0.0.1',
       });
     }
-
-    // remember which ports have been assigned to avoid giving out the same port twice
-    this.configStore.set(`ports.${portSelected}`, true);
-
-    return portSelected;
+    this.configStore.set(`ports.${this.portSelected}`, true);
+    return this.portSelected;
   }
 
   async init() {
@@ -179,8 +174,8 @@ class TwigRenderer {
     this.phpServerUrl = `http://127.0.0.1:${this.phpServerPort}`;
 
     // @todo Pass config to PHP server a better way than writing JSON file, then reading in PHP
-    const sharedConfigPath = path.join(__dirname, `shared-config--${this.phpServerPort}.json`);
-    await fs.writeFile(sharedConfigPath, JSON.stringify(this.config, null, '  '));
+    this.sharedConfigPath = path.join(__dirname, `shared-config--${this.phpServerPort}.json`);
+    await fs.writeFile(this.sharedConfigPath, JSON.stringify(this.config, null, '  '));
 
     const phpMemoryLimit = '4048M'; // @todo make user configurable
     const params = [
@@ -188,12 +183,12 @@ class TwigRenderer {
       `memory_limit=${phpMemoryLimit}`,
       path.join(__dirname, 'server--async.php'),
       this.phpServerPort,
-      sharedConfigPath,
+      this.sharedConfigPath,
     ];
 
     this.phpServer = execa('php', params, {
       cleanup: true,
-      detached: false,
+      detached: true,
     });
 
     // the PHP close event appears to happen first, THEN the exit event
@@ -204,7 +199,7 @@ class TwigRenderer {
 
     this.phpServer.on('exit', async () => {
       // console.log(`Server ${this.phpServerPort} event: 'exit'`);
-      await fs.unlink(sharedConfigPath);
+      this.stop();
       this.serverState = serverStates.STOPPED;
     });
 
@@ -229,9 +224,16 @@ class TwigRenderer {
 
   stop() {
     // console.log(`stopping server with port ${this.phpServerPort}`);
+    // remove old config file when we're done
+    try {
+      fs.accessSync(this.sharedConfigPath, fs.constants.R_OK | fs.constants.W_OK);
+      fs.unlinkSync(this.sharedConfigPath);
+    } catch (err) {
+      // console.error('no access!');
+    }
+    this.configStore.delete(`ports.${this.portSelected}`);
     this.serverState = serverStates.STOPPED;
-    this.phpServer.kill();
-    // ↓ not 100% sure if we need this w/ execa; other exec examples seem to do this for cleanup
+    this.phpServer.cancel(); // ↓ not 100% sure if we need this w/ execa; other exec examples seem to do this for cleanup
     this.phpServer.removeAllListeners();
   }
 
